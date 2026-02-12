@@ -1,155 +1,116 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, status
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
-from fastapi.responses import Response
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import sqlite3
+import hashlib
 
-from url_analyzer import (
-    check_ip_url,
-    check_suspicious_tld,
-    check_shortener,
-    check_keywords
-)
-
+# Import your existing modules
+from url_analyzer import check_ip_url, check_suspicious_tld, check_shortener, check_keywords
 from entropy import entropy_check
 from similarity import check_domain_similarity
 from scorer import calculate_risk
 from logger import log_request
 
+app = FastAPI(title="AegisAI", version="3.0")
 
-app = FastAPI(
-    title="AegisAI URL Defense Engine",
-    description="Enterprise-grade URL Threat Detection System",
-    version="2.1"
-)
+# 1. MOUNT STATIC FILES (This connects Frontend to Backend)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# --------------------------
-# CORS
-# --------------------------
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# 2. DATABASE SETUP (Simple SQLite for Login)
+def init_db():
+    conn = sqlite3.connect('aegis.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password TEXT)''')
+    conn.commit()
+    conn.close()
 
-# --------------------------
-# Security Headers
-# --------------------------
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        response: Response = await call_next(request)
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-        response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
-        return response
+init_db()
 
-app.add_middleware(SecurityHeadersMiddleware)
-
-
-# --------------------------
-# Request Model
-# --------------------------
+# 3. DATA MODELS
 class URLInput(BaseModel):
     url: str
 
+class UserAuth(BaseModel):
+    username: str
+    password: str
 
-# --------------------------
-# Health Endpoints
-# --------------------------
+# 4. AUTH ENDPOINTS
+@app.post("/register")
+def register(user: UserAuth):
+    conn = sqlite3.connect('aegis.db')
+    c = conn.cursor()
+    hashed_pw = hashlib.sha256(user.password.encode()).hexdigest()
+    try:
+        c.execute("INSERT INTO users VALUES (?, ?)", (user.username, hashed_pw))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        conn.close()
+        raise HTTPException(status_code=400, detail="User already exists")
+    conn.close()
+    return {"message": "User created successfully"}
+
+@app.post("/login")
+def login(user: UserAuth):
+    conn = sqlite3.connect('aegis.db')
+    c = conn.cursor()
+    hashed_pw = hashlib.sha256(user.password.encode()).hexdigest()
+    c.execute("SELECT * FROM users WHERE username=? AND password=?", (user.username, hashed_pw))
+    result = c.fetchone()
+    conn.close()
+    if not result:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return {"message": "Login successful", "username": user.username}
+
+# 5. PAGE ROUTES (Serving the HTML)
 @app.get("/")
-def root():
-    return {"status": "AegisAI Backend Running"}
+def serve_login():
+    return FileResponse('static/login.html')
 
-@app.get("/health")
-def health():
-    return {"status": "healthy"}
+@app.get("/dashboard")
+def serve_dashboard():
+    # In a real app, you'd check a token here, but for this demo we'll allow access
+    return FileResponse('static/index.html')
 
-
-# --------------------------
-# Analyze Endpoint
-# --------------------------
+# 6. ANALYZE ENDPOINT (Your existing logic, slightly cleaned)
 @app.post("/analyze")
 def analyze_url(data: URLInput):
-
     try:
         url = data.url.strip()
-
-        if not url:
-            raise HTTPException(status_code=400, detail="URL cannot be empty.")
-
+        if not url: raise HTTPException(status_code=400, detail="Empty URL")
+        
         log_request(url)
+        score_list = []
+        threats = []
 
-        score_list: List[int] = []
-        threats: List[str] = []
+        # Layer 1
+        score, reason = check_ip_url(url)
+        score_list.append(score)
+        if reason: threats.append(reason)
 
-        # 🔴 LAYER 1 – CRITICAL CHECKS
-        critical_checks = [check_ip_url]
+        # Layer 2
+        for check in [check_suspicious_tld, check_shortener, check_keywords]:
+            s, r = check(url)
+            score_list.append(s)
+            if r: threats.append(r)
 
-        for check in critical_checks:
-            score, reason = check(url)
-            score_list.append(score)
-            if reason:
-                threats.append(reason)
-
-            # Early exit if very dangerous
-            if score >= 80:
-                total_score, risk_level = calculate_risk(score_list)
-                return {
-                    "input_url": url,
-                    "risk_score": total_score,
-                    "risk_level": risk_level,
-                    "threats_detected": threats,
-                    "recommendation": "🚨 Do NOT visit this URL.",
-                    "engine_version": "AegisAI v2.1"
-                }
-
-        # 🟡 LAYER 2 – STRUCTURAL CHECKS
-        secondary_checks = [
-            check_suspicious_tld,
-            check_shortener,
-            check_keywords
-        ]
-
-        for check in secondary_checks:
-            score, reason = check(url)
-            score_list.append(score)
-            if reason:
-                threats.append(reason)
-
+        # Layer 3
         partial_score, _ = calculate_risk(score_list)
-
-        # 🟢 LAYER 3 – ADVANCED CHECKS (Only if needed)
         if partial_score < 70:
-            advanced_checks = [
-                entropy_check,
-                check_domain_similarity
-            ]
-
-            for check in advanced_checks:
-                score, reason = check(url)
-                score_list.append(score)
-                if reason:
-                    threats.append(reason)
+            for check in [entropy_check, check_domain_similarity]:
+                s, r = check(url)
+                score_list.append(s)
+                if r: threats.append(r)
 
         total_score, risk_level = calculate_risk(score_list)
-
-        recommendation = (
-            "🚨 Do NOT visit this URL."
-            if total_score >= 60
-            else "✅ URL appears relatively safe."
-        )
-
+        
         return {
-            "input_url": url,
             "risk_score": total_score,
             "risk_level": risk_level,
-            "threats_detected": threats,
-            "recommendation": recommendation,
-            "engine_version": "AegisAI v2.1"
+            "threats": threats,
+            "recommendation": "🚨 UNSAFE" if total_score > 60 else "✅ SAFE"
         }
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
