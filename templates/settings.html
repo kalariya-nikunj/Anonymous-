@@ -1,101 +1,23 @@
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <title>Settings | AegisAI</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        body {
-            background: #f4f6f9;
-            transition: 0.3s;
-        }
-
-        body.dark-mode {
-            background: #1a1a1a;
-            color: white;
-        }
-
-        .sidebar {
-            height: 100vh;
-            width: 250px;
-            position: fixed;
-            background: #0f2942;
-            color: white;
-            padding-top: 20px;
-        }
-
-        .nav-link {
-            color: #b0c4d6;
-            padding: 15px 25px;
-            display: block;
-            text-decoration: none;
-        }
-
-        .nav-link:hover,
-        .nav-link.active {
-            background: rgba(30, 144, 255, 0.1);
-            color: #1e90ff;
-            border-left: 4px solid #1e90ff;
-        }
-
-        .main {
-            margin-left: 250px;
-            padding: 30px;
-        }
-
-        .card {
-            border: none;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        }
-
-        .dark-mode .card {
-            background: #333;
-            color: white;
-        }
-    </style>
-</head>
-
-<body>
-    <div class="sidebar">
-        <h3 class="px-4 mb-4"><i class="fas fa-shield-alt"></i> AegisAI</h3>
-        <a href="/dashboard" class="nav-link"><i class="fas fa-th-large me-2"></i> Dashboard</a>
-        <a href="/scans" class="nav-link"><i class="fas fa-search me-2"></i> Scans</a>
-        <a href="/reports" class="nav-link"><i class="fas fa-file-alt me-2"></i> Reports</a>
-        <a href="/settings" class="nav-link active"><i class="fas fa-cog me-2"></i> Settings</a>
-        <a href="/account" class="nav-link"><i class="fas fa-user me-2"></i> Account</a>
-    </div>
-
-    <div class="main">
-        <h2>Settings</h2>
-        <div class="card p-4 mt-4">
-            <h5>Appearance</h5>
-            <div class="form-check form-switch mt-3">
-                <input class="form-check-input" type="checkbox" id="darkModeSwitch">
-                <label class="form-check-label" for="darkModeSwitch">Enable Dark Mode</label>
-            </div>
+{% extends "base.html" %}
+{% block content %}
+<div class="card p-4 shadow-sm">
+    <h4 class="fw-bold">Settings</h4>
+    <hr>
+    <div class="d-flex justify-content-between align-items-center">
+        <span>Dark Mode</span>
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="modeBtn" style="transform:scale(1.5)">
         </div>
     </div>
-
-    <script>
-        const toggle = document.getElementById('darkModeSwitch');
-
-        // Check saved preference
-        if (localStorage.getItem('theme') === 'dark') {
-            document.body.classList.add('dark-mode');
-            toggle.checked = true;
-        }
-
-        toggle.addEventListener('change', () => {
-            if (toggle.checked) {
-                document.body.classList.add('dark-mode');
-                localStorage.setItem('theme', 'dark');
-            } else {
-                document.body.classList.remove('dark-mode');
-                localStorage.setItem('theme', 'light');
-            }
-        });
-    </script>
-</body>
-
-</html>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+    const btn = document.getElementById('modeBtn');
+    if (localStorage.getItem('theme') === 'dark') btn.checked = true;
+    btn.onchange = () => {
+        if (btn.checked) { document.body.classList.add('dark-mode'); localStorage.setItem('theme', 'dark'); }
+        else { document.body.classList.remove('dark-mode'); localStorage.setItem('theme', 'light'); }
+    };
+</script>
+{% endblock %}

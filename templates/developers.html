@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8 text-center">
+        <h1 class="fw-bold mb-4" style="font-size: 3rem; font-weight: 900;">The Architects</h1>
+        <p class="text-muted mb-5">The team behind AegisAI: Building a safer web through intelligent forensic analysis.
+        </p>
+
+        <!-- Group Photo Card -->
+        <div class="card p-3 mb-5 shadow-lg border-0" style="background: var(--card); border-radius: 20px;">
+            <img src="{{ url_for('static', filename='group.jpg') }}" class="img-fluid"
+                style="border-radius: 15px; width: 100%; height: auto; object-fit: cover;"
+                alt="AegisAI Development Team">
+
+            <div class="card-body px-0 pt-4">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <h5 class="fw-bold mb-1">Falak Shah</h5>
+                        <small class="text-primary text-uppercase fw-bold" style="font-size: 0.7rem;">Security
+                            Analyst</small>
+                    </div>
+                    <div class="col-md-4 mb-3 border-start border-end border-secondary border-opacity-25">
+                        <h5 class="fw-bold mb-1">Hiranshee Doshi</h5>
+                        <small class="text-primary text-uppercase fw-bold" style="font-size: 0.7rem;">Lead
+                            Developer</small>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <h5 class="fw-bold mb-1">Nikunj Kalariya</h5>
+                        <small class="text-primary text-uppercase fw-bold" style="font-size: 0.7rem;">Forensic
+                            Engineer</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <a href="/dashboard" class="btn btn-outline-primary px-4 rounded-pill fw-bold">
+            <i class="bi bi-arrow-left me-2"></i>Back to Scanner
+        </a>
+    </div>
+</div>
+{% endblock %}
